@@ -1,0 +1,22 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# datasets and outputs
+datasets/
+*.csv
+*.parquet
+looptab/experiments/results/*
+!looptab/experiments/results/.gitkeep
+runs/
+wandb/
+*.pt
+*.ckpt
+looptab/paper/figures/*
+!looptab/paper/figures/.gitkeep
+looptab/paper/tables/*
+!looptab/paper/tables/.gitkeep
