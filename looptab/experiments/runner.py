@@ -123,7 +123,11 @@ def run_experiment(
         tcfg = TrainConfig.from_dict(train_cfg, eff.get("loss"))
         if verbose:
             print(f"[{data.name}] {label}: {count_parameters(model):,} params", flush=True)
-        res = Trainer(model, data, tcfg, out_dir=out_dir, verbose=verbose).fit()
+        signature = {"dataset": data.name, "model": label, "key": key, "kwargs": kwargs,
+                     "n_num": data.n_num, "cat_cardinalities": list(data.cat_cardinalities),
+                     "n_train": len(data.train)}
+        res = Trainer(model, data, tcfg, out_dir=out_dir, verbose=verbose,
+                      signature=signature).fit()
         res["n_params"] = count_parameters(model)
         res["model_kwargs"] = kwargs
         res["_model"] = model  # not serialised; used by analysis scripts

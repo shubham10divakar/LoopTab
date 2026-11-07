@@ -116,7 +116,7 @@ def test_trainer_learns_synthetic(tmp_path):
                       device="cpu")
     res = Trainer(model, data, cfg, out_dir=tmp_path, verbose=False).fit()
     assert res["test"]["auc_roc"] > 0.8
-    assert (tmp_path / "model.pt").exists() and (tmp_path / "result.json").exists()
+    assert (tmp_path / "best.pt").exists() and (tmp_path / "last.pt").exists() and (tmp_path / "result.json").exists()
     assert "f1_at_val_thr" in res["test"]
 
 
@@ -132,3 +132,71 @@ def test_trainer_weighted_bce_and_balanced_sampling():
 def test_make_synthetic_rate():
     raw = make_synthetic(n=10000, fraud_rate=0.02)
     assert abs(raw.df["label"].mean() - 0.02) < 0.002
+
+
+# ---- checkpointing / resume / LR schedules -----------------------------------
+
+def _small_run(tmp_path, epochs, **kw):
+    torch.manual_seed(0)
+    data = prepare_dataset("synthetic", loader_kwargs={"n": 1500})
+    model = build_looptab("looptab-s", data.n_num, data.cat_cardinalities, d_model=16)
+    cfg = TrainConfig(batch_size=128, epochs=epochs, warmup_epochs=1, early_stopping_patience=50,
+                      device="cpu", **kw)
+    return Trainer(model, data, cfg, out_dir=tmp_path, verbose=False, signature={"t": 1})
+
+
+def test_resume_matches_uninterrupted_run(tmp_path):
+    full = _small_run(tmp_path / "full", 4).fit()
+
+    part = tmp_path / "part"
+    tr = _small_run(part, 4)
+    # simulate a crash after epoch 2: run 2 epochs with the same 4-epoch schedule
+    tr.cfg.epochs = 2
+    tr.fit()
+    state = torch.load(part / "last.pt", weights_only=False)
+    assert state["epoch"] == 2
+    state["finished"] = False
+    torch.save(state, part / "last.pt")
+
+    resumed = _small_run(part, 4).fit()
+    assert [h["epoch"] for h in resumed["history"]] == [1, 2, 3, 4]
+    for a, b in zip(full["history"], resumed["history"]):
+        assert a["train_loss"] == pytest.approx(b["train_loss"], rel=1e-5)
+        assert a["lr"] == pytest.approx(b["lr"])
+    assert full["test"]["auc_pr"] == pytest.approx(resumed["test"]["auc_pr"], rel=1e-5)
+    assert (part / "history.json").exists() and (part / "best.pt").exists()
+
+
+def test_finished_run_is_not_retrained(tmp_path):
+    first = _small_run(tmp_path, 2).fit()
+    again = _small_run(tmp_path, 2).fit()
+    assert len(again["history"]) == 2
+    assert again["test"]["auc_pr"] == pytest.approx(first["test"]["auc_pr"])
+
+
+def test_resume_refuses_other_config(tmp_path):
+    _small_run(tmp_path, 1).fit()
+    with pytest.raises(RuntimeError, match="different model/config"):
+        _small_run(tmp_path, 1, learning_rate=5e-4).fit()
+    _small_run(tmp_path, 1, learning_rate=5e-4, resume=False).fit()  # --fresh works
+
+
+def test_warmup_plateau_schedule():
+    from looptab.training import WarmupPlateau
+
+    opt = torch.optim.SGD([torch.nn.Parameter(torch.zeros(1))], lr=1.0)
+    sch = WarmupPlateau(opt, warmup_steps=4, factor=0.5, patience=1, min_lr=0.1)
+    lrs = []
+    for _ in range(4):
+        lrs.append(opt.param_groups[0]["lr"])
+        sch.step()
+    assert lrs == pytest.approx([0.25, 0.5, 0.75, 1.0])
+    assert opt.param_groups[0]["lr"] == 1.0
+    for score in [0.5] + [0.4] * 12:
+        sch.step_epoch(score)
+    assert opt.param_groups[0]["lr"] == pytest.approx(0.1)  # halved repeatedly, floored at min_lr
+
+
+def test_trainer_plateau_scheduler(tmp_path):
+    res = _small_run(tmp_path, 3, scheduler="plateau").fit()
+    assert len(res["history"]) == 3 and all("lr" in h for h in res["history"])

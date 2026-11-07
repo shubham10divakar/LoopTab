@@ -44,6 +44,8 @@ def main(argv=None) -> int:
     p.add_argument("--seed", type=int, default=None)
     p.add_argument("--epochs", type=int, default=None)
     p.add_argument("--device", default=None)
+    p.add_argument("--fresh", action="store_true",
+                   help="ignore an existing last.pt checkpoint and train from epoch 1")
     p.add_argument("--analyze", action="store_true", help="gate / attention diagnostics + figures")
     args = p.parse_args(argv)
 
@@ -52,6 +54,8 @@ def main(argv=None) -> int:
         cfg["training"]["epochs"] = args.epochs
     if args.device is not None:
         cfg["training"]["device"] = args.device
+    if args.fresh:
+        cfg["training"]["resume"] = False
     data = load_data(cfg, args.root)
     print(data.summary())
 

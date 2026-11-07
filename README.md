@@ -29,7 +29,7 @@ Z^k+1 = Z~ + FFN(LN(Z~))
 
 ```bash
 pip install -r requirements.txt        # or: pip install -e ".[baselines,extras,dev]"
-pytest                                  # 47 tests, ~15 s on CPU
+pytest                                  # 52 tests, ~15 s on CPU
 ```
 
 ## Quick start (no download needed)
@@ -39,7 +39,7 @@ python -m looptab.experiments.train --config synthetic --analyze
 ```
 
 This trains LoopTab-S on a synthetic dataset with higher-order interactions. It prints the test
-metrics and writes the checkpoint, `result.json`, gate and attention diagnostics, and figures to
+metrics and writes `best.pt` / `last.pt` checkpoints, `history.json`, `result.json`, gate and attention diagnostics, and figures to
 `looptab/experiments/results/synthetic/`.
 
 ## Datasets
@@ -91,6 +91,32 @@ foreach ($m in $models) { python -m looptab.experiments.run_all --configs fraud_
 Measured on an RTX 3060, one epoch of all six neural models takes about 30 s on Fraud eCom, 68 s on CCFraud,
 180 s on PaySim and 353 s on IEEE-CIS. The full single-seed suite takes roughly 5–9 hours, because early stopping
 usually ends a run after 30–50 epochs.
+
+### Checkpoints, resume and LR schedule
+
+Every neural run writes to `results/<dataset>/<model>_seed<seed>/`:
+
+| file | written | contents |
+|------|---------|----------|
+| `best.pt` | whenever val AUC-PR improves | best model weights (used for the final test metrics) |
+| `last.pt` | every epoch | full training state: model, optimizer, LR scheduler, AMP scaler, early-stopping counters, history, RNG states |
+| `history.json` | every epoch | per-epoch train loss, LR and all val metrics |
+| `result.json` | at the end | final val/test metrics and config |
+
+If a run is interrupted (Ctrl+C, crash, reboot), rerun the **same command**. It loads `last.pt` and
+continues from the next epoch, with the same result as an uninterrupted run. A finished run is not
+retrained. If the model or training config has changed since `last.pt` was written, the run stops with an
+error instead of resuming; pass `--fresh` to start over from epoch 1.
+
+Early stopping monitors val AUC-PR (`early_stopping_patience`, default 10). LR schedule options for
+the `training:` section:
+
+- `scheduler: cosine_warmup` (default, design doc): linear warmup for `warmup_epochs`, then cosine
+  decay to `min_lr` over `epochs`.
+- `scheduler: plateau`: same warmup, then the LR is multiplied by `plateau_factor` (0.5) whenever
+  val AUC-PR fails to improve for `plateau_patience` (3) epochs, down to `min_lr`. Keep
+  `plateau_patience` below `early_stopping_patience` so a lower LR gets a chance before stopping.
+- `scheduler: none`: constant LR.
 
 ### LoopTab variants
 
@@ -173,3 +199,4 @@ docs/looptab_design_doc.md
   - LoopTab-G (graph-augmented)
   - Optuna search (a grid sweep is provided instead)
   - wandb / tensorboard logging (results are logged as JSON / JSONL)
+  - Checkpointing / resume for the ablation sweeps (`evaluation/ablation.py` runs keep no `out_dir`)

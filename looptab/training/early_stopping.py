@@ -40,3 +40,12 @@ class EarlyStopping:
     def restore(self, model: nn.Module) -> None:
         if self.best_state is not None:
             model.load_state_dict(self.best_state)
+
+    def state_dict(self) -> dict:
+        """Counters only; the best weights live in ``best.pt``."""
+        return {"best_score": self.best_score, "best_epoch": self.best_epoch, "counter": self.counter}
+
+    def load_state_dict(self, state: dict) -> None:
+        self.best_score = state["best_score"]
+        self.best_epoch = state["best_epoch"]
+        self.counter = state["counter"]

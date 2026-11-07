@@ -38,7 +38,10 @@ def main(argv=None) -> int:
                    help="parent dir holding one subdir per dataset (overrides config roots)")
     p.add_argument("--out", default="looptab/experiments/results")
     p.add_argument("--epochs", type=int, default=None)
-    p.add_argument("--resume", action="store_true", help="skip (dataset, model, seed) already done")
+    p.add_argument("--resume", action="store_true", help="skip (dataset, model, seed) already in main.jsonl; "
+                   "interrupted runs always continue from their last.pt")
+    p.add_argument("--fresh", action="store_true",
+                   help="ignore an existing last.pt checkpoint and train from epoch 1")
     p.add_argument("--quiet", action="store_true")
     args = p.parse_args(argv)
 
@@ -53,6 +56,8 @@ def main(argv=None) -> int:
         cfg = load_config(cfg_name)
         if args.epochs is not None:
             cfg["training"]["epochs"] = args.epochs
+        if args.fresh:
+            cfg["training"]["resume"] = False
         root = str(Path(args.data_root) / cfg["data"]["name"]) if args.data_root else None
         try:
             data = load_data(cfg, root)
