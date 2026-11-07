@@ -47,9 +47,21 @@ def main(argv=None) -> int:
     p.add_argument("--out", default="datasets", help="output dir (per-dataset subdir when 'all')")
     args = p.parse_args(argv)
     names = list(SOURCES) if args.dataset == "all" else [args.dataset]
+    failed = []
     for n in names:
         target = Path(args.out) / n if args.dataset == "all" else Path(args.out)
-        download(n, target)
+        try:
+            download(n, target)
+        except (subprocess.CalledProcessError, FileNotFoundError) as e:
+            failed.append(n)
+            print(f"[error] {n}: {e}")
+            if SOURCES[n][0] == "competition":
+                print(f"  A 403 here usually means the competition rules are not accepted yet.\n"
+                      f"  Open https://www.kaggle.com/competitions/{SOURCES[n][1]}/rules, click\n"
+                      f"  'I Understand and Accept', then rerun with --dataset {n}.")
+    if failed:
+        print(f"failed: {', '.join(failed)}")
+        return 1
     return 0
 
 
