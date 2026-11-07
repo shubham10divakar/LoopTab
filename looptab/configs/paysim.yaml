@@ -1,0 +1,40 @@
+# PaySim, stratified 1M-row subsample. Set drop_balance: true for the
+# leakage-free variant (balance columns can reveal the label).
+data:
+  name: paysim
+  root: datasets/paysim
+  split_strategy: stratified
+  train_ratio: 0.7
+  val_ratio: 0.15
+  scaler: quantile
+  loader_kwargs:
+    subsample: 1000000
+    drop_balance: false
+
+model:
+  variant: looptab-d
+  d_model: 128
+  n_heads: 8
+  n_loops: 4
+  d_ff: 512
+  dropout: 0.1
+  tied_weights: true
+
+training:
+  batch_size: 1024
+  epochs: 100
+  early_stopping_patience: 10
+  monitor: auc_pr
+  optimizer: adamw
+  learning_rate: 1.0e-3
+  weight_decay: 1.0e-5
+  scheduler: cosine_warmup
+  warmup_epochs: 5
+  grad_clip: 1.0
+  amp: false
+  seed: 42
+
+loss:
+  type: focal
+  alpha: 0.75   # weight for the positive (fraud) class
+  gamma: 2.0    # focusing parameter

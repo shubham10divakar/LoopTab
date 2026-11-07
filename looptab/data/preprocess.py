@@ -257,7 +257,7 @@ def load_ieee_cis(root: str | Path, n_features: int | None = 67,
     """IEEE-CIS: merge transaction + identity on TransactionID.
 
     The FDB benchmark's exact 67-column list is not bundled here. By default we
-    use a fixed core of 46 informative columns (amount, card/addr, C, D, M,
+    use a fixed core of 47 informative columns (amount, card/addr, C, D, M,
     e-mail domains, device) and fill up to ``n_features`` with the V columns
     of lowest missing rate on the training split (selected later in
     ``prepare_dataset``). Pass ``features={"num": [...], "cat": [...]}`` to use

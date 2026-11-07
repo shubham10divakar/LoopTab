@@ -1,0 +1,37 @@
+# Fraud e-commerce (Fraud_Data.csv).
+data:
+  name: fraud_ecom
+  root: datasets/fraud_ecom
+  split_strategy: stratified
+  train_ratio: 0.7
+  val_ratio: 0.15
+  scaler: quantile
+  min_frequency: 5
+
+model:
+  variant: looptab-d
+  d_model: 128
+  n_heads: 8
+  n_loops: 4
+  d_ff: 512
+  dropout: 0.1
+  tied_weights: true
+
+training:
+  batch_size: 512
+  epochs: 100
+  early_stopping_patience: 10
+  monitor: auc_pr
+  optimizer: adamw
+  learning_rate: 1.0e-3
+  weight_decay: 1.0e-5
+  scheduler: cosine_warmup
+  warmup_epochs: 5
+  grad_clip: 1.0
+  amp: false
+  seed: 42
+
+loss:
+  type: focal
+  alpha: 0.75   # weight for the positive (fraud) class
+  gamma: 2.0    # focusing parameter

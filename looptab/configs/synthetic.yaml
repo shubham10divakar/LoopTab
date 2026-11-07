@@ -1,0 +1,38 @@
+# Synthetic smoke-test dataset (no download needed).
+data:
+  name: synthetic
+  split_strategy: stratified
+  train_ratio: 0.7
+  val_ratio: 0.15
+  scaler: standard
+  loader_kwargs:
+    n: 30000
+    fraud_rate: 0.02
+
+model:
+  variant: looptab-s
+  d_model: 64
+  n_heads: 4
+  n_loops: 2
+  d_ff: 256
+  dropout: 0.1
+  tied_weights: true
+
+training:
+  batch_size: 512
+  epochs: 20
+  early_stopping_patience: 5
+  monitor: auc_pr
+  optimizer: adamw
+  learning_rate: 1.0e-3
+  weight_decay: 1.0e-5
+  scheduler: cosine_warmup
+  warmup_epochs: 1
+  grad_clip: 1.0
+  amp: false
+  seed: 42
+
+loss:
+  type: focal
+  alpha: 0.75   # weight for the positive (fraud) class
+  gamma: 2.0    # focusing parameter
