@@ -77,14 +77,43 @@ python -m looptab.evaluation.ablation --config ieee_cis --study imbalance
 python -m looptab.evaluation.ablation --config ieee_cis --study focal
 ```
 
-### Model names
+### Running one model at a time
 
-| name | description |
-|------|-------------|
-| `looptab` | architecture from the config's `model:` section (default) |
-| `looptab-s`, `looptab-d` | presets from Section 3 (K=2, d=64 / K=4, d=128) |
-| `looptab-u` | untied: K independent blocks |
-| `looptab-nogate`, `looptab-noloop`, `looptab-nodense`, `looptab-nofocal` | ablations. Each one flips a single switch on the config architecture |
+Running `run_all` with one dataset and one model adds the result to `results/main.jsonl` and rebuilds the summary
+table each time. With `--resume`, models that already finished are skipped, so you can stop and restart at any point.
+Datasets from fastest to slowest: `fraud_ecom`, `ccfraud`, `paysim`, `ieee_cis`.
+
+```powershell
+$models = "xgboost","lightgbm","random_forest","ft_transformer","tab_transformer","tabnet","saint","looptab-s","looptab-d"
+foreach ($m in $models) { python -m looptab.experiments.run_all --configs fraud_ecom --models $m --seeds 42 --resume }
+```
+
+Measured on an RTX 3060, one epoch of all six neural models takes about 30 s on Fraud eCom, 68 s on CCFraud,
+180 s on PaySim and 353 s on IEEE-CIS. The full single-seed suite takes roughly 5–9 hours, because early stopping
+usually ends a run after 30–50 epochs.
+
+### LoopTab variants
+
+Parameter counts are measured at IEEE-CIS scale (67 features).
+
+| name | K | d / heads / FFN | tied | params | what it is |
+|------|---|-----------------|------|--------|------------|
+| `looptab` | config | config | config | | default: the config's `model:` section (LoopTab-D for the four real datasets) |
+| `looptab-s` | 2 | 64 / 4 / 256 | yes | ~76K | shallow preset |
+| `looptab-d` | 4 | 128 / 8 / 512 | yes | ~267K | main model |
+| `looptab-u` | 4 | 128 / 8 / 512 | **no** | ~961K | untied: one block per loop (the "− weight tying" ablation) |
+| `looptab-nogate` | 4 | config | yes | ~234K | gate removed, `Z = Z + A` |
+| `looptab-noloop` | **1** | config | yes | ~267K | single pass |
+| `looptab-nodense` | 4 | config | yes | ~267K | classifies from `Z^K` only, no aggregation |
+| `looptab-nofocal` | 4 | config | yes | ~267K | weighted BCE instead of focal loss |
+
+Each ablation changes exactly one thing on the config architecture. Loop depth can also be swept with
+`--study depth --ks 1 2 3 4 5 6`. The graph-augmented LoopTab-G is not implemented.
+
+### Baselines
+
+| name | type |
+|------|------|
 | `ft_transformer`, `tab_transformer`, `tabnet`, `saint`, `mlp` | neural baselines |
 | `xgboost`, `lightgbm`, `random_forest` | tree baselines |
 
